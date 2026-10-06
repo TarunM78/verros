@@ -273,6 +273,23 @@ def export_zip(settings_json: str) -> bytes:
     return buf.getvalue()
 
 
+def solid_model(settings_json: str) -> str:
+    """SolidModel description (see pygeartrain.solid_model) for a CAD kernel to turn into STEP."""
+    from pygeartrain.solid_model import SolidSettings, build_solid_model
+    if S.gear is None or S.spec.export is None:
+        raise ValueError('This gear train has no tooth profiles to export.')
+    cfg = json.loads(settings_json)
+    settings = SolidSettings(
+        target_diameter_mm=float(cfg.get('target_diameter_mm', 70.0)),
+        thickness_mm=float(cfg.get('thickness_mm', 10.0)),
+        helix_angle_deg=float(cfg.get('helix_angle_deg', 0.0)),
+        gear_type=str(cfg.get('gear_type', 'spur')),
+        layer_gap_mm=float(cfg.get('layer_gap_mm', 1.0)),
+    )
+    model = build_solid_model(S.gear, S.spec.export(S.gear), settings)
+    return json.dumps(model, allow_nan=False)
+
+
 def export_report(settings_json: str) -> str:
     """Messages only (no files), for previewing scale and point counts."""
     if S.gear is None or S.spec.export is None:

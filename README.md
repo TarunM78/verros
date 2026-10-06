@@ -27,9 +27,20 @@ shapely), which the browser then caches.
 Features: all gear train types (planetary, compound planetary, cycloidal,
 compound cycloid, Nabtesco, simple pair, gerotor, angular-contact traction),
 choice of input / output / fixed member, symbolic and numeric ratios, assembly
-warnings, animation with speed and phase control, PNG and WebM download, and a
-zip of CAD point curves for SolidWorks. Designs are encoded in the URL hash so a
-link reproduces them.
+warnings, animation with speed and phase control, PNG and WebM download, a zip
+of CAD point curves for SolidWorks, and direct **STEP export** of 3D solids.
+Designs are encoded in the URL hash so a link reproduces them.
+
+### STEP export
+
+The "STEP solids" card builds real B-rep solids in the browser with
+OpenCascade (via [replicad](https://replicad.xyz)) and downloads a zip with one
+`<part>.step` per gear, centred on its own axis with the mid-plane at Z=0, plus
+`assembly.step` with every part placed as in the animation. Spur, helical and
+herringbone teeth are supported; ring gears get an outer boundary circle, pin
+rings become solid pins, and discs keep their bearing holes. The geometry comes
+from `pygeartrain/solid_model.py`, which turns the 2D profiles into faces with
+holes plus placements; the same description drives the desktop exporter.
 
 ### Run locally
 
@@ -54,7 +65,15 @@ cd pygeartrain
 ```
 
 Same catalogue as the web app, rendered with matplotlib. Also exports animated
-GIFs and writes CAD curve files straight to a folder.
+GIFs and writes CAD curve files straight to a folder. "Export STEP solids"
+writes the same per-part and assembly STEP files as the web app, using
+[CadQuery](https://cadquery.readthedocs.io). CadQuery is optional; install it
+without letting pip replace the pinned NumPy:
+
+```bash
+.venv\Scripts\python -m pip install --no-deps cadquery
+.venv\Scripts\python -m pip install "cadquery-ocp>=7.9.3.1,<8" ezdxf "multimethod<2" runtype casadi nlopt==2.7.1 typing_extensions
+```
 
 ## Library notes
 

@@ -149,7 +149,9 @@
     $('rec-btn').disabled = !spec.animatable;
     $('phase').disabled = !spec.animatable;
     $('export-btn').disabled = !spec.exportable;
+    $('step-btn').disabled = !spec.exportable;
     $('export-log').hidden = true;
+    $('step-log').hidden = true;
 
     if (restore && restore.spec === spec.name) {
       applyValues(restore.kin, restore.params, restore.fuse);
@@ -522,6 +524,103 @@
     }
   }
 
+  // ---------------------------------------------------------------- STEP export (OpenCascade in a second worker)
+  let cadWorker = null;
+  const cadPending = new Map();
+  let cadNextId = 1;
+
+  function ensureCadWorker() {
+    if (cadWorker) return cadWorker;
+    cadWorker = new Worker('step/cad-worker.js', { type: 'module' });
+    cadWorker.onmessage = (ev) => {
+      const msg = ev.data;
+      if (msg.type === 'progress') {
+        setStatus(`STEP: ${msg.text}`);
+        const bar = $('step-progress');
+        bar.hidden = false;
+        if (typeof msg.fraction === 'number') bar.value = msg.fraction;
+        return;
+      }
+      const p = cadPending.get(msg.id);
+      if (!p) return;
+      cadPending.delete(msg.id);
+      msg.ok ? p.resolve(msg) : p.reject(new Error(msg.error));
+    };
+    cadWorker.onerror = (e) => {
+      const err = new Error(e.message || 'the CAD worker failed to load');
+      for (const p of cadPending.values()) p.reject(err);
+      cadPending.clear();
+      cadWorker.terminate();
+      cadWorker = null;
+    };
+    return cadWorker;
+  }
+
+  function cadCall(cmd, payload = {}) {
+    return new Promise((resolve, reject) => {
+      const id = cadNextId++;
+      cadPending.set(id, { resolve, reject });
+      ensureCadWorker().postMessage({ id, cmd, ...payload });
+    });
+  }
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error(`could not load ${src}`));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function loadJSZip() {
+    if (!window.JSZip) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    return window.JSZip;
+  }
+
+  async function exportStep() {
+    if (!state.result?.exportable) return;
+    const btn = $('step-btn');
+    const log = $('step-log');
+    btn.disabled = true;
+    $('step-progress').hidden = false;
+    $('step-progress').value = 0;
+    try {
+      setStatus('STEP: preparing solid model…');
+      const settings = { ...exportSettings(), layer_gap_mm: Number($('exp-gap').value) || 0 };
+      const { model } = await call('solid_model', { settings });
+      const options = { parts: true, assembly: $('step-assembly').checked, curves: $('step-curves').value };
+      const t0 = performance.now();
+      const res = await cadCall('build', { model, options });
+      const JSZip = await loadJSZip();
+      const zip = new JSZip();
+      for (const f of res.files) zip.file(f.name, f.data);
+      zip.file('README.txt', [
+        'pygeartrain STEP export', '',
+        `Gear train: ${state.spec.name}`, `Title: ${state.result.title}`,
+        `Settings: ${JSON.stringify(settings)}`, `Curves: ${options.curves}`, '',
+        'Each <part>.step is centred on its own axis with the mid-plane at Z=0.',
+        'assembly.step places every part as in the animation at phase 0; stacked stages are',
+        `offset along Z by thickness + ${settings.layer_gap_mm} mm. Units: mm.`,
+      ].join('\n'));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(blob, suggestName('step.zip'));
+      const secs = ((performance.now() - t0) / 1000).toFixed(1);
+      log.hidden = false;
+      log.textContent = [`Built ${res.files.length} STEP files in ${secs} s`, '',
+        ...res.files.map((f) => `  ${f.name}  (${(f.data.byteLength / 1024).toFixed(0)} KB)`)].join('\n');
+      setStatus(`STEP export done: ${res.files.length} files`);
+    } catch (e) {
+      setStatus(`STEP export failed: ${e.message || e}`, true);
+      log.hidden = false;
+      log.textContent = `STEP export failed: ${e.message || e}`;
+    } finally {
+      btn.disabled = false;
+      $('step-progress').hidden = true;
+    }
+  }
+
   // ---------------------------------------------------------------- URL state
   function writeHash(kin, params) {
     const obj = { spec: state.spec.name, kin, params };
@@ -562,6 +661,7 @@
   $('png-btn').addEventListener('click', savePng);
   $('rec-btn').addEventListener('click', recordWebm);
   $('export-btn').addEventListener('click', exportCad);
+  $('step-btn').addEventListener('click', exportStep);
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.target.matches('input, select, textarea, button, summary, a')) { e.preventDefault(); toggleAnimation(); }

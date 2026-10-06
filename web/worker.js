@@ -71,6 +71,8 @@ function handle(msg) {
       const bytes = zip.toJs();
       zip.destroy();
       postMessage({ id, ok: true, bytes }, [bytes.buffer]);
+    } else if (cmd === 'solid_model') {
+      postMessage({ id, ok: true, model: JSON.parse(api.solid_model(JSON.stringify(msg.settings))) });
     } else if (cmd === 'export_report') {
       postMessage({ id, ok: true, report: JSON.parse(api.export_report(JSON.stringify(msg.settings))) });
     } else {

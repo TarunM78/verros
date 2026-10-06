@@ -11,6 +11,10 @@
 # - pycomplex declares two C-only deps (fastcache, pycosat) that have no Windows wheels; it is
 #   installed with --no-deps and shimmed by .venv/Lib/site-packages/fastcache.py (functools.lru_cache)
 #   and .venv/Lib/site-packages/pycosat.py (backed by python-sat).
+# - Optional, for STEP export (pygeartrain/step_export.py, GUI "Export STEP solids"): CadQuery. A plain
+#   `pip install cadquery` upgrades numpy to 2.x (via nlopt>=2.9), so install it without deps instead:
+#   pip install --no-deps cadquery && pip install "cadquery-ocp>=7.9.3.1,<8" ezdxf "multimethod<2" runtype casadi nlopt==2.7.1 typing_extensions
+#   (numba and trame are only needed by cadquery.vis and are left out.)
 numpy<2
 scipy>=1.9
 matplotlib

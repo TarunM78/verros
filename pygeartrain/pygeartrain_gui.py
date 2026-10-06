@@ -23,7 +23,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from pygeartrain import cad_export
+from pygeartrain import cad_export, solid_model, step_export
 from pygeartrain.specs import SPECS, SPEC_BY_NAME, GearSpec, Param
 
 
@@ -254,6 +254,14 @@ class GearTrainApp:
                   text='Writes <part>_z0 / _z_pos / _z_neg .txt point files (mm). Import each with '
                        'Insert > Curve > Curve Through XYZ Points and loft between them. Helix hand is set '
                        'automatically so sun and planets mesh; pins and discs are exported untwisted.'
+                  ).grid(row=r, column=0, columnspan=3, sticky='w', pady=(6, 0))
+        r += 1
+        self.export_step_btn = ttk.Button(f, text='Export STEP solids', style='Big.TButton', command=self.export_step)
+        self.export_step_btn.grid(row=r, column=0, columnspan=3, sticky='ew', pady=(8, 0))
+        r += 1
+        ttk.Label(f, style='Hint.TLabel', wraplength=self.wrap, justify='left',
+                  text='Writes <part>.step solids (mid plane at z=0) plus assembly.step with every part placed, '
+                       'into the "step" subfolder. Needs CadQuery (pip install cadquery).'
                   ).grid(row=r, column=0, columnspan=3, sticky='w', pady=(6, 0))
         f.columnconfigure(1, weight=1)
 
@@ -599,6 +607,48 @@ class GearTrainApp:
         lines += ['', 'Files:'] + ['  ' + os.path.basename(f) for f in report.files]
         self._set_text(self.export_log, '\n'.join(lines))
         self._set_status(f'Exported {len(report.files)} curve files to {os.path.abspath(out_dir)}')
+
+    def export_step(self):
+        if self.gear is None or self.spec.export is None:
+            return
+        try:
+            settings = solid_model.SolidSettings(
+                target_diameter_mm=float(self.diam_var.get()),
+                thickness_mm=float(self.thick_var.get()),
+                helix_angle_deg=float(self.helix_var.get()),
+                gear_type=self.tooth_type_var.get(),
+            )
+        except (tk.TclError, ValueError):
+            self._set_status('Export settings must be numbers.', error=True)
+            return
+        out_dir = self.out_dir_var.get().strip()
+        if not out_dir:
+            self._set_status('Choose an output folder first.', error=True)
+            return
+        step_dir = os.path.join(out_dir, 'step')
+        self._set_status('Building STEP solids (this can take a while)...')
+        self.root.update_idletasks()
+        try:
+            spec = self.spec.export(self.gear)
+            model = solid_model.build_solid_model(self.gear, spec, settings)
+            files = step_export.write_step(model, step_dir)
+        except RuntimeError as e:
+            # most likely CadQuery is not installed
+            self._set_status(str(e), error=True)
+            messagebox.showerror('STEP export unavailable', str(e))
+            return
+        except Exception as e:
+            traceback.print_exc()
+            self._set_status(f'STEP export failed: {e}', error=True)
+            messagebox.showerror('STEP export failed', f'{type(e).__name__}: {e}')
+            return
+        lines = [f'Exported {len(files)} STEP files to {os.path.abspath(step_dir)}', '',
+                 f"{len(model['parts'])} parts, {len(model['instances'])} instances, "
+                 f"{model['gear_type']}, thickness {model['thickness_mm']:g} mm, scale {model['scale_factor']:.4f}", '']
+        lines += [f"  {p['name']}: half twist {p['half_twist_deg']:+.3f} deg" for p in model['parts']]
+        lines += ['', 'Files:'] + ['  ' + os.path.basename(f) for f in files]
+        self._set_text(self.export_log, '\n'.join(lines))
+        self._set_status(f'Exported {len(files)} STEP files to {os.path.abspath(step_dir)}')
 
     def _browse_out_dir(self):
         d = filedialog.askdirectory(initialdir=self.out_dir_var.get() or os.getcwd())
