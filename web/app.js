@@ -26,20 +26,25 @@
       return;
     }
     if (msg.type === 'ready') { onReady(msg.specs); return; }
-    if (msg.type === 'error') {
-      $('loading').querySelector('.overlay-card').classList.add('error');
-      $('loading').querySelector('.spinner').style.display = 'none';
-      $('loading-text').textContent = `Failed to start: ${msg.text}`;
-      setStatus(`Failed to start: ${msg.text}`, true);
-      return;
-    }
+    if (msg.type === 'error') { showFatal(msg.text); return; }
     const p = pending.get(msg.id);
     if (!p) return;
     pending.delete(msg.id);
     msg.ok ? p.resolve(msg) : p.reject(new Error(msg.error));
   };
 
-  worker.onerror = (e) => setStatus(`Worker error: ${e.message}`, true);
+  worker.onerror = (e) => {
+    const text = e.message || 'the background worker failed to load (is the Pyodide CDN reachable?)';
+    if (!$('loading').hidden) showFatal(text); else setStatus(`Worker error: ${text}`, true);
+  };
+
+  function showFatal(text) {
+    $('loading').hidden = false;
+    $('loading').querySelector('.overlay-card').classList.add('error');
+    $('loading').querySelector('.spinner').style.display = 'none';
+    $('loading-text').textContent = `Failed to start: ${text}`;
+    setStatus(`Failed to start: ${text}`, true);
+  }
 
   // ---------------------------------------------------------------- state
   const state = {
@@ -173,7 +178,8 @@
   }
 
   function applyValues(kin, params, fuse) {
-    if (kin) {
+    params = params && typeof params === 'object' ? params : {};
+    if (Array.isArray(kin) && kin.length >= 2) {
       $('kin-input').value = kin[0];
       $('kin-output').value = kin[1];
       if (state.spec.has_fixed && kin[2]) $('kin-fixed').value = kin[2];
@@ -234,6 +240,8 @@
       showResults(result);
       showWarnings(result.warnings, false);
       writeHash(kin, params);
+      state.scene = null;
+      state.frame = null;
       if (result.animatable) {
         await requestFrame(0);
       } else {
@@ -305,6 +313,9 @@
       $('phase').value = String(mod2pi(msg.phase));
       $('phase-label').textContent = `${mod2pi(msg.phase).toFixed(3)} rad`;
       draw();
+    } catch (e) {
+      setStatus(String(e.message || e), true);
+      stopAnimation();
     } finally {
       state.frameInFlight = false;
     }
@@ -536,7 +547,10 @@
   });
 
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.tab').forEach((t) => {
+      t.classList.toggle('active', t === tab);
+      t.setAttribute('aria-selected', String(t === tab));
+    });
     document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === `tab-${tab.dataset.tab}`));
   }));
 
@@ -550,7 +564,7 @@
   $('export-btn').addEventListener('click', exportCad);
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && !e.target.matches('input, select, textarea, button')) { e.preventDefault(); toggleAnimation(); }
+    if (e.code === 'Space' && !e.target.matches('input, select, textarea, button, summary, a')) { e.preventDefault(); toggleAnimation(); }
   });
   window.addEventListener('resize', resizeCanvas);
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);

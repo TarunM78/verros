@@ -25,7 +25,7 @@
       <span>Gear Train Designer</span>
     </div>
     <div class="topbar-right">
-      <span id="status" class="status">Loading…</span>
+      <span id="status" class="status" aria-live="polite">Loading…</span>
       <a class="link" href="https://github.com/CKraft11/pygeartrain" target="_blank" rel="noopener">pygeartrain</a>
     </div>
   </header>
@@ -33,11 +33,11 @@
   <main class="layout">
     <aside class="sidebar">
       <nav class="tabs" role="tablist">
-        <button class="tab active" data-tab="design" role="tab">Design</button>
-        <button class="tab" data-tab="animate" role="tab">Animate &amp; Export</button>
+        <button class="tab active" data-tab="design" role="tab" aria-selected="true">Design</button>
+        <button class="tab" data-tab="animate" role="tab" aria-selected="false">Animate &amp; Export</button>
       </nav>
 
-      <section id="tab-design" class="tab-panel active">
+      <section id="tab-design" class="tab-panel active" role="tabpanel">
         <div class="card">
           <h2>Gear train</h2>
           <label class="field">
@@ -79,7 +79,7 @@
         </div>
       </section>
 
-      <section id="tab-animate" class="tab-panel">
+      <section id="tab-animate" class="tab-panel" role="tabpanel">
         <div class="card">
           <h2>Animation</h2>
           <div class="row">
@@ -124,7 +124,7 @@
     </aside>
 
     <section class="stage">
-      <canvas id="canvas"></canvas>
+      <canvas id="canvas" aria-label="Gear train drawing"></canvas>
       <div id="canvas-title" class="canvas-title"></div>
       <div id="stage-warn" class="stage-warn" hidden></div>
     </section>

@@ -40,7 +40,7 @@ jobs:
           for name in ('fastcache.py', 'pycosat.py'):
               open(f'{sp}/{name}', 'w').write(z.read(name).decode())
           EOF
-          cd pygeartrain && MPLBACKEND=Agg python -m pytest pygeartrain/test -q
+          cd pygeartrain && MPLBACKEND=Agg python -m pytest pygeartrain/test pygeartrain/core/pga.py -q
 
       - name: Prepare site
         run: |

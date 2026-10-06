@@ -128,7 +128,7 @@ def build(spec_name: str, kin_json: str, params_json: str) -> str:
             'animatable': spec.animatable,
             'exportable': spec.export is not None,
         }
-        return json.dumps(result)
+        return json.dumps(result, allow_nan=False)  # NaN/inf would be invalid JSON for the browser
     except Exception as e:  # surface everything to the UI
         return json.dumps({'ok': False, 'error': f'{type(e).__name__}: {e}'})
 
