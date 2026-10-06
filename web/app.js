@@ -5,7 +5,7 @@
   const $ = (id) => document.getElementById(id);
 
   // ---------------------------------------------------------------- worker RPC
-  const worker = new Worker('worker.js');
+  const worker = new Worker('worker.js?v=__BUILD__');
   const pending = new Map();
   let nextId = 1;
 
@@ -531,7 +531,7 @@
 
   function ensureCadWorker() {
     if (cadWorker) return cadWorker;
-    cadWorker = new Worker('step/cad-worker.js', { type: 'module' });
+    cadWorker = new Worker('step/cad-worker.js?v=__BUILD__', { type: 'module' });
     cadWorker.onmessage = (ev) => {
       const msg = ev.data;
       if (msg.type === 'progress') {

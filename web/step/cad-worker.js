@@ -16,7 +16,7 @@
 // jsDelivr (pinned versions below) on the first 'build' request, once.  The
 // wasm is ~23 MB uncompressed (~6.5 MB brotli over the wire).
 
-import * as builder from './step_builder.js';
+import * as builder from './step_builder.js?v=__BUILD__';
 
 const REPLICAD_VERSION = '1.1.0';
 const OC_VERSION = '1.1.0';

@@ -47,6 +47,8 @@ jobs:
           mkdir -p site
           cp -r web/index.html web/app.js web/worker.js web/style.css web/dist web/step site/
           touch site/.nojekyll
+          # cache-bust every script reference with the commit id (Pages caches for 10 min)
+          sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" site/index.html site/app.js site/step/cad-worker.js
 
       - uses: actions/upload-pages-artifact@v3
         with:
