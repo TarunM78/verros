@@ -1,0 +1,26 @@
+# pip-based setup for pygeartrain (alternative to environment.yml / conda).
+#
+#   py -3.12 -m venv .venv
+#   .venv\Scripts\python -m pip install -r requirements.txt
+#   .venv\Scripts\python -m pip install --no-deps git+https://github.com/eelcohoogendoorn/pycomplex.git
+#
+# Notes:
+# - numpy is pinned < 2 only because the optional numga reference needs NumPy 1.x integer promotion.
+# - numga is optional: pygeartrain/core/pga.py no longer needs it; the pin below is only used by
+#   test_pga as a reference implementation. It is the last commit before numga's 2026-09 rewrite.
+# - pycomplex declares two C-only deps (fastcache, pycosat) that have no Windows wheels; it is
+#   installed with --no-deps and shimmed by .venv/Lib/site-packages/fastcache.py (functools.lru_cache)
+#   and .venv/Lib/site-packages/pycosat.py (backed by python-sat).
+numpy<2
+scipy>=1.9
+matplotlib
+sympy
+pytest
+shapely
+imageio
+einops
+numpy-indexed
+cached-property
+funcsigs
+python-sat
+git+https://github.com/eelcohoogendoorn/numga.git@fe9f0ff69fdf8fc3430544eb76431729d2cdbcb3

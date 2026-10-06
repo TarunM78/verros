@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gear Train Designer</title>
+  <meta name="description" content="Design planetary, compound planetary, cycloidal and Nabtesco gear trains in the browser: ratios, animation and CAD curve export. Powered by pygeartrain running in Pyodide.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='34' fill='none' stroke='%232563eb' stroke-width='14' stroke-dasharray='14 8'/%3E%3Ccircle cx='50' cy='50' r='12' fill='%232563eb'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="loading" class="overlay">
+    <div class="overlay-card">
+      <div class="spinner"></div>
+      <h1>Gear Train Designer</h1>
+      <p id="loading-text">Starting Python runtime…</p>
+      <div class="progress"><div id="loading-bar"></div></div>
+      <p class="hint">First load downloads about 40 MB of Python packages (numpy, scipy, sympy, shapely). Your browser caches them for next time.</p>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span>Gear Train Designer</span>
+    </div>
+    <div class="topbar-right">
+      <span id="status" class="status">Loading…</span>
+      <a class="link" href="https://github.com/CKraft11/pygeartrain" target="_blank" rel="noopener">pygeartrain</a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="design" role="tab">Design</button>
+        <button class="tab" data-tab="animate" role="tab">Animate &amp; Export</button>
+      </nav>
+
+      <section id="tab-design" class="tab-panel active">
+        <div class="card">
+          <h2>Gear train</h2>
+          <label class="field">
+            <span>Type</span>
+            <select id="spec-select"></select>
+          </label>
+          <p id="spec-description" class="hint"></p>
+          <label class="field">
+            <span>Preset</span>
+            <select id="preset-select"></select>
+          </label>
+        </div>
+
+        <div class="card">
+          <h2>Kinematics</h2>
+          <label class="field"><span>Input</span><select id="kin-input"></select></label>
+          <label class="field"><span>Output</span><select id="kin-output"></select></label>
+          <label class="field" id="kin-fixed-field"><span>Fixed</span><select id="kin-fixed"></select></label>
+          <label class="field" id="kin-extra-field" hidden><span id="kin-extra-label"></span><select id="kin-extra"></select></label>
+        </div>
+
+        <div class="card">
+          <h2>Geometry</h2>
+          <div id="params" class="params"></div>
+          <div id="warnings" class="warnings" hidden></div>
+          <button id="update-btn" class="primary">Update</button>
+          <p class="hint">Changes apply automatically. Press Enter in any field to rebuild.</p>
+        </div>
+
+        <div class="card results" id="results" hidden>
+          <h2>Results</h2>
+          <div class="ratio-big"><span id="ratio-value">–</span><span class="ratio-unit">: 1</span></div>
+          <div class="kv"><span>Input / output</span><code id="res-io"></code></div>
+          <div class="kv"><span>Symbolic ratio</span><code id="res-symbolic"></code></div>
+          <details>
+            <summary>Rotation of each member per output turn</summary>
+            <table id="res-table"></table>
+          </details>
+        </div>
+      </section>
+
+      <section id="tab-animate" class="tab-panel">
+        <div class="card">
+          <h2>Animation</h2>
+          <div class="row">
+            <button id="play-btn" class="primary">Play</button>
+            <button id="step-btn">Step</button>
+            <button id="reset-btn">Reset</button>
+          </div>
+          <label class="field slider">
+            <span>Speed <code id="speed-label">1×</code></span>
+            <input id="speed" type="range" min="-2" max="2" step="0.05" value="0">
+          </label>
+          <label class="field slider">
+            <span>Phase (output rotation) <code id="phase-label">0.000 rad</code></span>
+            <input id="phase" type="range" min="0" max="6.2832" step="0.001" value="0">
+          </label>
+          <p class="hint">Space bar toggles play when not typing in a field.</p>
+        </div>
+
+        <div class="card">
+          <h2>Images &amp; video</h2>
+          <button id="png-btn">Download PNG</button>
+          <div class="row" style="margin-top:8px">
+            <label class="field inline"><span>Seconds</span><input id="rec-seconds" type="number" min="1" max="60" step="1" value="6"></label>
+            <button id="rec-btn">Record WebM</button>
+          </div>
+          <p id="rec-status" class="hint"></p>
+        </div>
+
+        <div class="card">
+          <h2>CAD export</h2>
+          <p class="hint">Point files for SolidWorks <em>Insert › Curve › Curve Through XYZ Points</em>. Each part gets a curve at Z=0 and at ±thickness/2; loft between them.</p>
+          <label class="field inline"><span>Outer diameter of largest part (mm)</span><input id="exp-diam" type="number" step="0.1" value="70"></label>
+          <label class="field inline"><span>Face width / thickness (mm)</span><input id="exp-thick" type="number" step="0.1" value="10"></label>
+          <label class="field inline"><span>Tooth type</span>
+            <select id="exp-type"><option value="spur">spur</option><option value="helix">helix</option><option value="herringbone" selected>herringbone</option></select>
+          </label>
+          <label class="field inline"><span>Helix angle (°)</span><input id="exp-helix" type="number" step="0.5" value="20"></label>
+          <button id="export-btn" class="primary">Download curves (.zip)</button>
+          <pre id="export-log" class="log" hidden></pre>
+        </div>
+      </section>
+    </aside>
+
+    <section class="stage">
+      <canvas id="canvas"></canvas>
+      <div id="canvas-title" class="canvas-title"></div>
+      <div id="stage-warn" class="stage-warn" hidden></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

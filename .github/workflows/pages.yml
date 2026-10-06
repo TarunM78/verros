@@ -1,0 +1,63 @@
+name: Deploy web app to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build Python bundle for the browser
+        run: python web/build_bundle.py
+
+      - name: Run library tests (headless)
+        run: |
+          python -m pip install -q -r pygeartrain/requirements.txt
+          python -m pip install -q --no-deps git+https://github.com/eelcohoogendoorn/pycomplex.git
+          # pycomplex declares two C-only deps that have no wheels; the same shims the browser uses
+          SITE=$(python -c "import site; print(site.getsitepackages()[0])")
+          python - <<'EOF'
+          import zipfile, site
+          z = zipfile.ZipFile('web/dist/bundle.zip')
+          sp = site.getsitepackages()[0]
+          for name in ('fastcache.py', 'pycosat.py'):
+              open(f'{sp}/{name}', 'w').write(z.read(name).decode())
+          EOF
+          cd pygeartrain && MPLBACKEND=Agg python -m pytest pygeartrain/test -q
+
+      - name: Prepare site
+        run: |
+          mkdir -p site
+          cp -r web/index.html web/app.js web/worker.js web/style.css web/dist site/
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
