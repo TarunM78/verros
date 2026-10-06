@@ -429,13 +429,38 @@
   function toggleAnimation() { state.playing ? stopAnimation() : startAnimation(); }
 
   // ---------------------------------------------------------------- downloads
-  function downloadBlob(blob, filename) {
+  const heldUrls = new Map(); // slot -> object URL kept alive for the visible save link
+
+  function downloadBlob(blob, filename, slot = null) {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = url;
     a.download = filename;
+    a.rel = 'noopener';
     document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    try { a.click(); } catch (e) { console.warn('automatic download failed', e); }
+    setTimeout(() => a.remove(), 1000);
+    if (slot) {
+      // Browsers may ignore a download that is not tied to a user gesture (the STEP build
+      // finishes seconds after the click). Show a link the user can click directly.
+      const old = heldUrls.get(slot);
+      if (old) URL.revokeObjectURL(old);
+      heldUrls.set(slot, url);
+      const box = $(slot);
+      box.hidden = false;
+      box.innerHTML = '';
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.className = 'save-link';
+      link.textContent = `Save ${filename} (${(blob.size / 1024 / 1024).toFixed(1)} MB)`;
+      const hint = document.createElement('span');
+      hint.className = 'hint';
+      hint.textContent = ' If no download started, click this link.';
+      box.append(link, hint);
+    } else {
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
   }
 
   function suggestName(ext) {
@@ -512,13 +537,18 @@
         call('export', { settings }),
         call('export_report', { settings }),
       ]);
-      downloadBlob(new Blob([bytes], { type: 'application/zip' }), suggestName('zip'));
+      downloadBlob(new Blob([bytes], { type: 'application/zip' }), suggestName('zip'), 'export-save');
       const log = $('export-log');
       log.hidden = false;
+      log.classList.remove('error');
       log.textContent = [`Scale factor ${report.scale.toFixed(6)}`, ...report.messages, '', 'Files:', ...report.files.map((f) => '  ' + f)].join('\n');
       setStatus(`Exported ${report.files.length} curve files`);
     } catch (e) {
       setStatus(`Export failed: ${e.message || e}`, true);
+      const log = $('export-log');
+      log.hidden = false;
+      log.classList.add('error');
+      log.textContent = `Export failed: ${e.message || e}`;
     } finally {
       btn.disabled = false;
     }
@@ -605,16 +635,20 @@
         `offset along Z by thickness + ${settings.layer_gap_mm} mm. Units: mm.`,
       ].join('\n'));
       const blob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(blob, suggestName('step.zip'));
+      downloadBlob(blob, suggestName('step.zip'), 'step-save');
       const secs = ((performance.now() - t0) / 1000).toFixed(1);
       log.hidden = false;
+      log.classList.remove('error');
       log.textContent = [`Built ${res.files.length} STEP files in ${secs} s`, '',
         ...res.files.map((f) => `  ${f.name}  (${(f.data.byteLength / 1024).toFixed(0)} KB)`)].join('\n');
       setStatus(`STEP export done: ${res.files.length} files`);
     } catch (e) {
       setStatus(`STEP export failed: ${e.message || e}`, true);
       log.hidden = false;
-      log.textContent = `STEP export failed: ${e.message || e}`;
+      log.classList.add('error');
+      log.textContent = `STEP export failed: ${e.message || e}
+
+If this mentions a blocked or failed download/import, the browser could not load the OpenCascade kernel from cdn.jsdelivr.net (network filter, offline, or an older browser without module workers).`;
     } finally {
       btn.disabled = false;
       $('step-progress').hidden = true;
