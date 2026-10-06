@@ -149,7 +149,7 @@
     $('rec-btn').disabled = !spec.animatable;
     $('phase').disabled = !spec.animatable;
     $('export-btn').disabled = !spec.exportable;
-    $('step-btn').disabled = !spec.exportable;
+    $('step-export-btn').disabled = !spec.exportable;
     $('export-log').hidden = true;
     $('step-log').hidden = true;
 
@@ -611,7 +611,7 @@
 
   async function exportStep() {
     if (!state.result?.exportable) return;
-    const btn = $('step-btn');
+    const btn = $('step-export-btn');
     const log = $('step-log');
     btn.disabled = true;
     $('step-progress').hidden = false;
@@ -695,7 +695,7 @@ If this mentions a blocked or failed download/import, the browser could not load
   $('png-btn').addEventListener('click', savePng);
   $('rec-btn').addEventListener('click', recordWebm);
   $('export-btn').addEventListener('click', exportCad);
-  $('step-btn').addEventListener('click', exportStep);
+  $('step-export-btn').addEventListener('click', exportStep);
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.target.matches('input, select, textarea, button, summary, a')) { e.preventDefault(); toggleAnimation(); }
