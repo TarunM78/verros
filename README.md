@@ -5,17 +5,21 @@ a browser app (GitHub Pages), a desktop GUI, and the patched library they share.
 
 ```
 verros/
-├── web/                 Browser app. Runs the real Python library in Pyodide.
-│   ├── index.html, app.js, worker.js, style.css
-│   └── build_bundle.py  Packs pygeartrain + pure-Python deps into web/dist/bundle.zip
-├── pygeartrain/         Library (fork of CKraft11/pygeartrain, see pygeartrain/UPSTREAM.md)
-│   ├── pygeartrain/     package: gear trains, profiles, kinematics
-│   │   ├── cad_export.py   SolidWorks XYZ curve export for every gear type
-│   │   ├── specs.py        catalogue of gear types, parameters and presets (shared by both GUIs)
-│   │   └── webapi.py       JSON/array API used by the web app
-│   ├── pygeartrain_gui.py  desktop (tkinter + matplotlib) GUI
-│   └── requirements.txt    pip setup (no conda needed)
-└── .github/workflows/pages.yml   builds the bundle, runs tests, deploys web/ to Pages
+├── verros_tools/
+│   ├── web/                 Browser app. Runs the real Python library in Pyodide.
+│   │   ├── index.html, app.js, worker.js, style.css
+│   │   ├── step/            OpenCascade (replicad) worker that builds STEP solids
+│   │   └── build_bundle.py  Packs pygeartrain + pure-Python deps into web/dist/bundle.zip
+│   └── pygeartrain/         Library (fork of CKraft11/pygeartrain, see pygeartrain/UPSTREAM.md)
+│       ├── pygeartrain/     package: gear trains, profiles, kinematics
+│       │   ├── cad_export.py   SolidWorks XYZ curve export for every gear type
+│       │   ├── solid_model.py  faces, holes, twist and placements for a CAD kernel
+│       │   ├── step_export.py  STEP solids via CadQuery (desktop, optional)
+│       │   ├── specs.py        catalogue of gear types, parameters and presets (shared by both GUIs)
+│       │   └── webapi.py       JSON/array API used by the web app
+│       ├── pygeartrain_gui.py  desktop (tkinter + matplotlib) GUI
+│       └── requirements.txt    pip setup (no conda needed)
+└── .github/workflows/pages.yml   builds the bundle, runs tests, deploys the web app to Pages
 ```
 
 ## Web app
@@ -60,7 +64,7 @@ Then open <http://localhost:8765>. The bundle must be served over HTTP (not
 ## Desktop GUI
 
 ```bash
-cd pygeartrain
+cd verros_tools\pygeartrain
 .venv\Scripts\python pygeartrain_gui.py
 ```
 
@@ -77,7 +81,7 @@ without letting pip replace the pinned NumPy:
 
 ## Library notes
 
-`pygeartrain/` is the upstream library with these changes:
+`verros_tools/pygeartrain/` is the upstream library with these changes:
 
 - `cad_export.py`, `specs.py`, `webapi.py` added.
 - Plot and GIF helpers draw on an explicit figure/axes instead of matplotlib's
@@ -90,4 +94,4 @@ without letting pip replace the pinned NumPy:
   library never calls into them.
 
 Run the tests with `MPLBACKEND=Agg python -m pytest pygeartrain/test -q` from
-inside `pygeartrain/`.
+inside `verros_tools/pygeartrain/`.
