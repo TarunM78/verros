@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 from pygeartrain.compound_cycloid import *
 
 
@@ -28,4 +31,4 @@ def test_readme():
 	# carrier-driven
 	kinematics = CompoundCycloid('c', 'r2', 'r1')
 	gear = CompoundCycloidGeometry.create(kinematics, P1=3, P2=4)
-	gear.plot(show=False, filename='../../cycloid.png')
+	gear.plot(show=False, filename=os.path.join(tempfile.gettempdir(), 'cycloid.png'))

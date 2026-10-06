@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 from tkinter.messagebox import showerror
 
 from pygeartrain.angular_contact import *
@@ -26,4 +29,4 @@ def test_readme():
 	kinematics = AngularContact('rib','rot','rob','rib-rit')
 	print(kinematics)
 	gear = AngularContactGeometry.from_geometry(kinematics, cone=5, tilt=5)
-	gear.plot(show=False, filename='../../angular_contact.png')
+	gear.plot(show=False, filename=os.path.join(tempfile.gettempdir(), 'angular_contact.png'))
