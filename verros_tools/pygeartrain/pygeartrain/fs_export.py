@@ -72,7 +72,12 @@ def generate_featurescript(model: Dict, title: str = 'Gear train', feature_name:
         faces = []
         for face in part['faces']:
             holes = ', '.join(_fmt_loop(h) for h in face['holes'])
-            faces.append('{ "outer" : ' + _fmt_loop(face['outer']) + ', "holes" : [' + holes + '] }')
+            if part.get('internal') and part.get('outer_radius_mm'):
+                # ring gear wall: a true circle instead of the polygonised one
+                outer = '{ "circle" : %.6f }' % float(part['outer_radius_mm'])
+            else:
+                outer = _fmt_loop(face['outer'])
+            faces.append('{ "outer" : ' + outer + ', "holes" : [' + holes + '] }')
         lines.append(f'const FACES_{ident} = [' + ', '.join(faces) + '];')
     lines.append('')
     lines.append('const PARTS = [')
@@ -103,6 +108,8 @@ def generate_featurescript(model: Dict, title: str = 'Gear train', feature_name:
     lines.append('            annotation { "Name" : "Helix angle" }')
     lines.append('            isAngle(definition.helixAngle, HELIX_BOUNDS);')
     lines.append('        }')
+    lines.append('        annotation { "Name" : "Tooth clearance (total backlash)" }')
+    lines.append('        isLength(definition.clearance, BACKLASH_BOUNDS);')
     lines.append('        annotation { "Name" : "Gap between stacked stages" }')
     lines.append('        isLength(definition.layerGap, GAP_BOUNDS);')
     lines.append('        annotation { "Name" : "Layout" }')
@@ -117,6 +124,7 @@ def generate_featurescript(model: Dict, title: str = 'Gear train', feature_name:
     lines.append('            "toothType" : definition.toothType,')
     lines.append('            "helixAngle" : definition.toothType == ToothType.SPUR ? 0 * degree : definition.helixAngle,')
     lines.append('            "layout" : definition.layout,')
+    lines.append('            "clearance" : definition.clearance,')
     lines.append('            "smooth" : definition.smooth')
     lines.append('        });')
     lines.append('    });')
