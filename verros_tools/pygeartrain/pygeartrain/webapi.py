@@ -290,6 +290,16 @@ def solid_model(settings_json: str) -> str:
     return json.dumps(model, allow_nan=False)
 
 
+def featurescript(settings_json: str) -> str:
+    """Onshape FeatureScript source for the current gear train at the export scale."""
+    from pygeartrain.fs_export import generate_featurescript
+    if S.gear is None or S.spec.export is None:
+        raise ValueError('This gear train has no tooth profiles to export.')
+    model = json.loads(solid_model(settings_json))
+    title = f'{S.spec.name} ' + ' '.join(f'{k}={v}' for k, v in S.params.items() if isinstance(v, (int, float)) and not isinstance(v, bool))
+    return generate_featurescript(model, title=title)
+
+
 def dimensions(settings_json: str) -> str:
     """Key dimensions (mm) at the export scale: outer diameters, planet-centre circle, offsets."""
     from pygeartrain.solid_model import dimensions as _dimensions

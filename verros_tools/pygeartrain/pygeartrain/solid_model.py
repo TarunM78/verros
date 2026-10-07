@@ -21,6 +21,7 @@ Schema (SolidModel)
                                  # unioned into one solid, e.g. a carrier plate with its pins
       "outer_radius_mm": 38.5,   # only for internal parts: radius of the outer boundary circle
       "ref_radius_mm": 35.0,     # radius at which the helix angle is measured (max radius)
+      "hand": -1,                # sign of the helix for this part (+1 sun, -1 planet/ring, 0 untwisted)
       "half_twist_deg": 4.3,     # signed rotation of the +thickness/2 face relative to the mid plane.
                                  # helix: the -thickness/2 face is rotated by -half_twist_deg
                                  # herringbone: the -thickness/2 face is rotated by +half_twist_deg
@@ -350,6 +351,7 @@ def build_solid_model(gear, export_spec: Dict, settings: SolidSettings) -> Dict:
             'fuse': bool(fused),
             'outer_radius_mm': float(ref_radius * (1 + settings.ring_margin)) if internal else None,
             'ref_radius_mm': ref_radius,
+            'hand': int(it.hand),
             'half_twist_deg': math.degrees(half_twist),
             'faces': [{'outer': f['outer'].round(8).tolist(), 'holes': [h.round(8).tolist() for h in f['holes']]}
                       for f in faces],

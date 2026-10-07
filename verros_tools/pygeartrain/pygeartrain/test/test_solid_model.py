@@ -1,4 +1,6 @@
 import json
+import os
+import re
 import math
 
 import numpy as np
@@ -164,3 +166,32 @@ def test_webapi_dimensions():
     d = json.loads(api.dimensions(json.dumps({'target_diameter_mm': 100})))
     assert d['headline']['value_mm'] == pytest.approx(2 * d['scale_factor'])
     assert {r['part'] for r in d['rows']} == {'ring_30', 'planet_12', 'sun_6'}
+
+
+def test_featurescript_generation():
+    from pygeartrain.fs_export import generate_featurescript, builder_source, MAX_POINTS_PER_LOOP
+    gear = PlanetaryGeometry.create(Planetary('s', 'c', 'r'), (30, 12, 6), 3, b=0.5)
+    model = build_solid_model(gear, cad_export.planetary_items(gear), SolidSettings(70, 10, 20, 'herringbone'))
+    code = generate_featurescript(model, title='Planetary 30/12/6')
+    assert code.startswith('FeatureScript 1948;')
+    assert code.count('{') == code.count('}') and code.count('[') == code.count(']') and code.count('(') == code.count(')')
+    for name in ('FACES_RING_30', 'FACES_PLANET_12', 'FACES_SUN_6', 'export const verrosGearTrain', 'function buildGearTrain', 'export enum ToothType'):
+        assert name in code
+    assert '"Default" : "HERRINGBONE"' in code
+    assert code.count('"part" : "planet_12"') == 3
+    # every embedded loop is capped
+    for m in re.finditer(r'"outer" : \[(.*?)\], "holes"', code):
+        assert m.group(1).count('], [') + 1 <= MAX_POINTS_PER_LOOP
+    # the builder section comes verbatim from the parametric feature
+    assert builder_source() in code
+    # the parametric file itself is balanced and self-contained
+    src = open(os.path.join(os.path.dirname(cad_export.__file__), 'onshape', 'cycloidalPlanetary.fs'), encoding='utf-8').read()
+    assert src.count('{') == src.count('}') and src.count('(') == src.count(')')
+    assert 'export const cycloidalPlanetary' in src
+
+
+def test_webapi_featurescript():
+    from pygeartrain import webapi as api
+    api.build('Cycloidal drive', json.dumps(['c', 'p', 'r']), json.dumps({'P': 9, 'cycloid': 'epi', 'O': 6, 'b': 1.0, 'f': 0.8}))
+    code = api.featurescript(json.dumps({'target_diameter_mm': 60, 'thickness_mm': 8, 'gear_type': 'spur'}))
+    assert 'FACES_RING_PINS_10' in code and 'FACES_DISC_9' in code and '"fuse" : true' in code

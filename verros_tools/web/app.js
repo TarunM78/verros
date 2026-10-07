@@ -150,8 +150,11 @@
     $('phase').disabled = !spec.animatable;
     $('export-btn').disabled = !spec.exportable;
     $('step-export-btn').disabled = !spec.exportable;
+    $('fs-btn').disabled = !spec.exportable;
     $('export-log').hidden = true;
     $('step-log').hidden = true;
+    $('fs-log').hidden = true;
+    $('fs-save').hidden = true;
 
     if (restore && restore.spec === spec.name) {
       applyValues(restore.kin, restore.params, restore.fuse);
@@ -703,6 +706,31 @@ If this mentions a blocked or failed download/import, the browser could not load
     }
   }
 
+  // ---------------------------------------------------------------- Onshape FeatureScript
+  async function exportFeatureScript() {
+    if (!state.result?.exportable) return;
+    const btn = $('fs-btn');
+    const log = $('fs-log');
+    btn.disabled = true;
+    try {
+      setStatus('Generating FeatureScript…');
+      const settings = { ...exportSettings(), layer_gap_mm: Number($('exp-gap').value) || 0 };
+      const { code } = await call('featurescript', { settings });
+      downloadBlob(new Blob([code], { type: 'text/plain' }), suggestName('fs'), 'fs-save');
+      log.hidden = false;
+      log.classList.remove('error');
+      log.textContent = `${(code.length / 1024).toFixed(0)} KB of FeatureScript. In Onshape: create a Feature Studio, paste the code, commit, then open a Part Studio and add the new feature from the custom features toolbar.`;
+      setStatus('FeatureScript ready');
+    } catch (e) {
+      setStatus(`FeatureScript failed: ${e.message || e}`, true);
+      log.hidden = false;
+      log.classList.add('error');
+      log.textContent = `FeatureScript failed: ${e.message || e}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   // ---------------------------------------------------------------- URL state
   function writeHash(kin, params) {
     const obj = { spec: state.spec.name, kin, params };
@@ -745,6 +773,7 @@ If this mentions a blocked or failed download/import, the browser could not load
   $('export-btn').addEventListener('click', exportCad);
   $('exp-diam').addEventListener('input', scheduleDimensions);
   $('step-export-btn').addEventListener('click', exportStep);
+  $('fs-btn').addEventListener('click', exportFeatureScript);
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.target.matches('input, select, textarea, button, summary, a')) { e.preventDefault(); toggleAnimation(); }
