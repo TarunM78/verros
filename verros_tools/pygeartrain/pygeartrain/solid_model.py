@@ -211,6 +211,91 @@ def _layers(spec_name_or_gear, gear) -> List[Tuple[object, int]]:
     return [(p, 0) for p in flatten(arranged)]
 
 
+def compute_placements(gear, item_vertices: Dict[str, np.ndarray]) -> List[Dict]:
+    """Match every arranged profile (phase 0) to an export item and recover its rigid
+    placement.  Returns dicts {part, angle_deg, t (unscaled 2-vector), layer}."""
+    placements = []
+    used: Dict[str, int] = {name: 0 for name in item_vertices}
+    for profile, layer in _layers(None, gear):
+        w = np.asarray(profile.vertices, float)
+        if len(w) < 3:
+            continue
+        matches = []
+        for name, v in item_vertices.items():
+            if len(v) != len(w):
+                continue
+            angle, t, rms = rigid_fit(v, w)
+            if rms < 1e-7 * max(1.0, float(np.abs(v).max())):
+                matches.append((name, angle, t))
+        if not matches:
+            continue
+        # geometrically identical parts (e.g. a sun and a planet with equal teeth and module)
+        # are disambiguated by stage name, then by spreading instances over the candidates
+        staged = [m for m in matches if m[0].startswith(f'stage{layer + 1}_')]
+        if staged:
+            matches = staged
+        name, angle, t = min(matches, key=lambda m: used[m[0]])
+        used[name] += 1
+        placements.append({'part': name, 'angle_deg': math.degrees(angle), 't': t, 'layer': layer})
+    return placements
+
+
+def dimensions(gear, export_spec: Dict, target_diameter_mm: float) -> Dict:
+    """Key dimensions in mm at the given export scale, without building any solids.
+
+    rows: one per part with outer_diameter_mm, count (instances in the assembly),
+          center_offset_mm (distance of the part axis from the main axis) and, when
+          several copies share that offset, center_circle_diameter_mm.
+    headline: the single most useful number, e.g. the planet-centre circle of a
+          planetary ('Planet centre circle') or the eccentricity of a cycloid disc.
+    """
+    items = [it for it in export_spec['items'] if it.vertices is not None and len(it.vertices) >= 3]
+    if not items:
+        return {'scale_factor': 1.0, 'rows': [], 'headline': None}
+    ref_name = export_spec.get('reference')
+    ref_item = next((it for it in items if it.name == ref_name), None) or         max(items, key=lambda it: np.max(np.linalg.norm(it.vertices, axis=1)))
+    scale = cad_export.compute_scale_factor(ref_item.vertices, target_diameter_mm)
+    item_vertices = {it.name: np.asarray(it.vertices, float) for it in items}
+    placements = compute_placements(gear, item_vertices)
+
+    rows = []
+    for it in items:
+        mine = [pl for pl in placements if pl['part'] == it.name]
+        offsets = [float(np.hypot(*pl['t'])) * scale for pl in mine]
+        offset = max(offsets) if offsets else 0.0
+        row = {
+            'part': it.name,
+            'outer_diameter_mm': float(2 * np.max(np.linalg.norm(it.vertices, axis=1)) * scale),
+            'count': len(mine),
+            'center_offset_mm': offset,
+            'center_circle_diameter_mm': 2 * offset if offset > 1e-9 else 0.0,
+            'layer': mine[0]['layer'] if mine else 0,
+        }
+        rows.append(row)
+
+    headline = None
+    multi = [r for r in rows if r['count'] >= 2 and r['center_offset_mm'] > 1e-9]
+    single = [r for r in rows if r['count'] == 1 and r['center_offset_mm'] > 1e-9]
+    if multi:
+        r = multi[0]
+        kind = 'Planet' if 'planet' in r['part'] else ('Wobbler' if 'wobbler' in r['part'] else 'Part')
+        headline = {'label': f"{kind} centre circle diameter", 'value_mm': r['center_circle_diameter_mm'],
+                    'detail': f"{r['count']} x {r['part']}, each {r['center_offset_mm']:.3f} mm from the axis"}
+    elif len(single) >= 2:
+        # two offset parts (e.g. a gear pair): the centre distance between them
+        a, b = single[0], single[1]
+        ta = next(pl['t'] for pl in placements if pl['part'] == a['part'])
+        tb = next(pl['t'] for pl in placements if pl['part'] == b['part'])
+        headline = {'label': f"Centre distance {a['part']} to {b['part']}", 'value_mm': float(np.hypot(*(ta - tb))) * scale,
+                    'detail': 'distance between the two part axes'}
+    elif single:
+        r = single[0]
+        headline = {'label': f"{r['part']} centre offset (eccentricity)", 'value_mm': r['center_offset_mm'],
+                    'detail': 'distance between the part axis and the main axis'}
+    return {'scale_factor': float(scale), 'reference': ref_item.name,
+            'target_diameter_mm': float(target_diameter_mm), 'rows': rows, 'headline': headline}
+
+
 def build_solid_model(gear, export_spec: Dict, settings: SolidSettings) -> Dict:
     """export_spec is the dict returned by a cad_export.*_items adapter."""
     items: List[cad_export.ExportItem] = [it for it in export_spec['items']
@@ -271,30 +356,9 @@ def build_solid_model(gear, export_spec: Dict, settings: SolidSettings) -> Dict:
         })
         item_vertices[it.name] = np.asarray(it.vertices, float)
 
-    instances = []
-    used: Dict[str, int] = {name: 0 for name in item_vertices}
-    for profile, layer in _layers(None, gear):
-        w = np.asarray(profile.vertices, float)
-        if len(w) < 3:
-            continue
-        matches = []
-        for name, v in item_vertices.items():
-            if len(v) != len(w):
-                continue
-            angle, t, rms = rigid_fit(v, w)
-            if rms < 1e-7 * max(1.0, float(np.abs(v).max())):
-                matches.append((name, angle, t))
-        if not matches:
-            continue
-        # geometrically identical parts (e.g. a sun and a planet with equal teeth and module)
-        # are disambiguated by stage name, then by spreading instances over the candidates
-        staged = [m for m in matches if m[0].startswith(f'stage{layer + 1}_')]
-        if staged:
-            matches = staged
-        name, angle, t = min(matches, key=lambda m: used[m[0]])
-        used[name] += 1
-        instances.append({'part': name, 'angle_deg': math.degrees(angle),
-                          'x_mm': float(t[0] * scale), 'y_mm': float(t[1] * scale), 'layer': layer})
+    instances = [{'part': pl['part'], 'angle_deg': pl['angle_deg'],
+                  'x_mm': float(pl['t'][0] * scale), 'y_mm': float(pl['t'][1] * scale), 'layer': pl['layer']}
+                 for pl in compute_placements(gear, item_vertices)]
 
     return {
         'units': 'mm',

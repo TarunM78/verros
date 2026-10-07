@@ -232,6 +232,7 @@ class GearTrainApp:
         r += 1
         ttk.Label(f, text='Outer diameter of largest part (mm)').grid(row=r, column=0, sticky='w', pady=(4, 0))
         self.diam_var = tk.DoubleVar(value=70.0)
+        self.diam_var.trace_add('write', self._refresh_dimensions)
         ttk.Entry(f, textvariable=self.diam_var, width=10).grid(row=r, column=1, sticky='w', padx=(6, 0), pady=(4, 0))
         r += 1
         ttk.Label(f, text='Face width / thickness (mm)').grid(row=r, column=0, sticky='w', pady=(4, 0))
@@ -450,7 +451,40 @@ class GearTrainApp:
         lines.append('Rotation of each member per turn of the output:')
         for k, v in sorted(gear.ratios_f.items()):
             lines.append(f'   {k:>4} : {v:+.5g}')
+        lines += self._dimension_lines(gear)
         self._set_text(self.result_text, '\n'.join(lines))
+        self._last_results = (gear, kin)
+
+    def _dimension_lines(self, gear):
+        """Key sizes in mm at the export scale (outer diameter entry on the export tab)."""
+        if self.spec.export is None:
+            return []
+        try:
+            diameter = float(self.diam_var.get())
+        except (tk.TclError, ValueError):
+            return ['', 'Dimensions: enter a valid outer diameter on the Animate & Export tab.']
+        try:
+            dims = solid_model.dimensions(gear, self.spec.export(gear), diameter)
+        except Exception as e:  # never let a readout break the results panel
+            return ['', f'Dimensions unavailable: {e}']
+        lines = ['', f'Dimensions at {diameter:g} mm outer diameter of the largest part:']
+        head = dims['headline']
+        if head:
+            lines.append(f"   {head['label']}: {head['value_mm']:.3f} mm   ({head['detail']})")
+        for r in dims['rows']:
+            if r['count'] >= 2 and r['center_circle_diameter_mm'] > 0:
+                where = f"centres on a {r['center_circle_diameter_mm']:.3f} mm circle"
+            elif r['center_offset_mm'] > 1e-9:
+                where = f"axis offset {r['center_offset_mm']:.3f} mm"
+            else:
+                where = 'on axis'
+            lines.append(f"   {r['part']:<22s} outer dia {r['outer_diameter_mm']:8.3f} mm   x{r['count']}   {where}")
+        return lines
+
+    def _refresh_dimensions(self, *_):
+        last = getattr(self, '_last_results', None)
+        if last is not None and self.gear is last[0]:
+            self._show_results(*last)
 
     @staticmethod
     def _fmt_ratio(r: float) -> str:

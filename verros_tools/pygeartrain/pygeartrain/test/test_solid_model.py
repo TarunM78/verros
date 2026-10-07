@@ -130,3 +130,37 @@ def test_webapi_solid_model_roundtrip():
               json.dumps({'cone': 5, 'squat': 10, 'tilt': 5, 'asym': 0, 'Dr': 3}))
     with pytest.raises(ValueError):
         api.solid_model('{}')
+
+
+def test_dimensions_planetary_centre_circle():
+    from pygeartrain.solid_model import dimensions
+    gear = PlanetaryGeometry.create(Planetary('s', 'c', 'r'), (30, 12, 6), 3, b=0.5)
+    d = dimensions(gear, cad_export.planetary_items(gear), 70.0)
+    rows = {r['part']: r for r in d['rows']}
+    assert rows['ring_30']['outer_diameter_mm'] == pytest.approx(70.0)
+    # planet centres sit at unit radius in the library's units
+    assert rows['planet_12']['count'] == 3
+    assert rows['planet_12']['center_circle_diameter_mm'] == pytest.approx(2 * d['scale_factor'])
+    assert d['headline']['label'].startswith('Planet centre circle')
+    assert d['headline']['value_mm'] == pytest.approx(2 * d['scale_factor'])
+    # scales linearly with the requested diameter
+    d2 = dimensions(gear, cad_export.planetary_items(gear), 140.0)
+    assert d2['headline']['value_mm'] == pytest.approx(2 * d['headline']['value_mm'])
+
+
+def test_dimensions_gear_pair_centre_distance():
+    from pygeartrain.simple import SimpleGear, SimpleGeometry
+    from pygeartrain.solid_model import dimensions
+    gear = SimpleGeometry(SimpleGear('a', 'b'), {'A': 4, 'B': 5})
+    d = dimensions(gear, cad_export.simple_items(gear), 70.0)
+    rows = {r['part']: r for r in d['rows']}
+    assert d['headline']['label'].startswith('Centre distance')
+    assert d['headline']['value_mm'] == pytest.approx(rows['gear_a_4']['center_offset_mm'] + rows['gear_b_5']['center_offset_mm'])
+
+
+def test_webapi_dimensions():
+    from pygeartrain import webapi as api
+    api.build('Planetary', json.dumps(['s', 'c', 'r']), json.dumps({'R': 30, 'P': 12, 'S': 6, 'N': 3, 'b': 0.5}))
+    d = json.loads(api.dimensions(json.dumps({'target_diameter_mm': 100})))
+    assert d['headline']['value_mm'] == pytest.approx(2 * d['scale_factor'])
+    assert {r['part'] for r in d['rows']} == {'ring_30', 'planet_12', 'sun_6'}

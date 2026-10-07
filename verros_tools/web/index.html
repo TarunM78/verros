@@ -72,6 +72,7 @@
           <div class="ratio-big"><span id="ratio-value">–</span><span class="ratio-unit">: 1</span></div>
           <div class="kv"><span>Input / output</span><code id="res-io"></code></div>
           <div class="kv"><span>Symbolic ratio</span><code id="res-symbolic"></code></div>
+          <div class="kv" id="res-dims-row" hidden><span id="res-dims-label"></span><code id="res-dims-value"></code></div>
           <details>
             <summary>Rotation of each member per output turn</summary>
             <table id="res-table"></table>
@@ -120,6 +121,14 @@
           <button id="export-btn" class="primary">Download curves (.zip)</button>
           <div id="export-save" class="save-box" hidden></div>
           <pre id="export-log" class="log" hidden></pre>
+        </div>
+
+        <div class="card" id="dims-card" hidden>
+          <h2>Dimensions at this scale</h2>
+          <p class="hint">For the outer diameter entered above. Change it to see every size update.</p>
+          <div class="ratio-big"><span id="dims-headline-value">–</span><span class="ratio-unit">mm</span></div>
+          <div id="dims-headline-label" class="hint" style="margin-top:-6px"></div>
+          <table id="dims-table" class="dims-table"></table>
         </div>
 
         <div class="card">

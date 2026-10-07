@@ -290,6 +290,16 @@ def solid_model(settings_json: str) -> str:
     return json.dumps(model, allow_nan=False)
 
 
+def dimensions(settings_json: str) -> str:
+    """Key dimensions (mm) at the export scale: outer diameters, planet-centre circle, offsets."""
+    from pygeartrain.solid_model import dimensions as _dimensions
+    if S.gear is None or S.spec.export is None:
+        return json.dumps({'rows': [], 'headline': None})
+    cfg = json.loads(settings_json)
+    return json.dumps(_dimensions(S.gear, S.spec.export(S.gear), float(cfg.get('target_diameter_mm', 70.0))),
+                      allow_nan=False)
+
+
 def export_report(settings_json: str) -> str:
     """Messages only (no files), for previewing scale and point counts."""
     if S.gear is None or S.spec.export is None:

@@ -253,6 +253,7 @@
         draw();
       }
       setStatus(`${state.spec.name}: ratio ${fmtRatio(result.ratio)} : 1`);
+      refreshDimensions();
     } catch (e) {
       setStatus(String(e.message || e), true);
     } finally {
@@ -554,6 +555,53 @@
     }
   }
 
+  // ---------------------------------------------------------------- dimensions at the export scale
+  let dimsTimer = null;
+  function scheduleDimensions() {
+    clearTimeout(dimsTimer);
+    dimsTimer = setTimeout(refreshDimensions, 200);
+  }
+
+  async function refreshDimensions() {
+    const card = $('dims-card');
+    const row = $('res-dims-row');
+    if (!state.result?.exportable) { card.hidden = true; row.hidden = true; return; }
+    try {
+      const { dims } = await call('dimensions', { settings: { target_diameter_mm: Number($('exp-diam').value) || 70 } });
+      card.hidden = false;
+      const h = dims.headline;
+      $('dims-headline-value').textContent = h ? h.value_mm.toFixed(3) : '–';
+      $('dims-headline-label').textContent = h ? `${h.label}  ·  ${h.detail}` : 'No off-axis parts in this gear train.';
+      const table = $('dims-table');
+      table.innerHTML = '';
+      const head = document.createElement('tr');
+      for (const t of ['Part', 'Outer Ø', 'Qty', 'Centre circle Ø / offset']) {
+        const th = document.createElement('th'); th.textContent = t; head.appendChild(th);
+      }
+      table.appendChild(head);
+      for (const r of dims.rows) {
+        const tr = document.createElement('tr');
+        const centre = r.count >= 2 && r.center_circle_diameter_mm > 0 ? `Ø ${r.center_circle_diameter_mm.toFixed(3)}`
+          : r.center_offset_mm > 1e-9 ? `offset ${r.center_offset_mm.toFixed(3)}` : 'on axis';
+        for (const t of [r.part, r.outer_diameter_mm.toFixed(3), String(r.count), centre]) {
+          const td = document.createElement('td'); td.textContent = t; tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      if (h) {
+        row.hidden = false;
+        $('res-dims-label').textContent = `${h.label} (at ${dims.target_diameter_mm} mm outer Ø)`;
+        $('res-dims-value').textContent = `${h.value_mm.toFixed(3)} mm`;
+      } else {
+        row.hidden = true;
+      }
+    } catch (e) {
+      card.hidden = true;
+      row.hidden = true;
+      console.warn('dimensions failed', e);
+    }
+  }
+
   // ---------------------------------------------------------------- STEP export (OpenCascade in a second worker)
   let cadWorker = null;
   const cadPending = new Map();
@@ -695,6 +743,7 @@ If this mentions a blocked or failed download/import, the browser could not load
   $('png-btn').addEventListener('click', savePng);
   $('rec-btn').addEventListener('click', recordWebm);
   $('export-btn').addEventListener('click', exportCad);
+  $('exp-diam').addEventListener('input', scheduleDimensions);
   $('step-export-btn').addEventListener('click', exportStep);
 
   window.addEventListener('keydown', (e) => {
