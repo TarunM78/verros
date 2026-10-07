@@ -361,6 +361,10 @@ function loopSolid(context is Context, id is Id, loops is array, halfTwist is nu
     if (halfTwist == 0 || toothType == ToothType.SPUR)
     {
         const region = sketchLoops(context, id + "sk", loops, -h, 0, smooth);
+        if (size(evaluateQuery(context, region)) == 0)
+        {
+            throw regenError("Sketch produced no closed region (" ~ size(loops) ~ " loops, " ~ size(loops[0]) ~ " points)");
+        }
         opExtrude(context, id + "ex", {
             "entities" : region, "direction" : vector(0, 0, 1),
             "endBound" : BoundingType.BLIND, "endDepth" : thickness
@@ -373,7 +377,14 @@ function loopSolid(context is Context, id is Id, loops is array, halfTwist is nu
         const r0 = sketchLoops(context, id + "skA", loops, -h, -halfTwist, smooth);
         const r1 = sketchLoops(context, id + "skB", loops, 0 * millimeter, 0, smooth);
         const r2 = sketchLoops(context, id + "skC", loops, h, halfTwist, smooth);
-        opLoft(context, id + "loft", { "profileSubqueries" : [r0, r1, r2] });
+        try
+        {
+            opLoft(context, id + "loft", { "profileSubqueries" : [r0, r1, r2] });
+        }
+        catch (error)
+        {
+            throw regenError("Helical loft failed (" ~ size(loops[0]) ~ " points, twist " ~ halfTwist ~ " rad): " ~ toString(error));
+        }
         deleteSketch(context, id + "skA");
         deleteSketch(context, id + "skB");
         deleteSketch(context, id + "skC");
@@ -383,8 +394,15 @@ function loopSolid(context is Context, id is Id, loops is array, halfTwist is nu
     const rLow = sketchLoops(context, id + "skA", loops, -h, halfTwist, smooth);
     const rMid = sketchLoops(context, id + "skB", loops, 0 * millimeter, 0, smooth);
     const rHigh = sketchLoops(context, id + "skC", loops, h, halfTwist, smooth);
-    opLoft(context, id + "loftA", { "profileSubqueries" : [rLow, rMid] });
-    opLoft(context, id + "loftB", { "profileSubqueries" : [rMid, rHigh] });
+    try
+    {
+        opLoft(context, id + "loftA", { "profileSubqueries" : [rLow, rMid] });
+        opLoft(context, id + "loftB", { "profileSubqueries" : [rMid, rHigh] });
+    }
+    catch (error)
+    {
+        throw regenError("Herringbone loft failed (" ~ size(loops[0]) ~ " points, twist " ~ halfTwist ~ " rad): " ~ toString(error));
+    }
     deleteSketch(context, id + "skA");
     deleteSketch(context, id + "skB");
     deleteSketch(context, id + "skC");
@@ -457,7 +475,15 @@ function buildGearTrain(context is Context, id is Id, model is map, opts is map)
     {
         const part = model.parts[pi];
         const pid = id + ("part" ~ pi);
-        const body = buildPart(context, pid, part, opts);
+        var body;
+        try
+        {
+            body = buildPart(context, pid, part, opts);
+        }
+        catch (error)
+        {
+            throw regenError("Could not build part " ~ part.name ~ ": " ~ toString(error));
+        }
         setProperty(context, { "entities" : body, "propertyType" : PropertyType.NAME, "value" : part.name });
 
         // instances of this part
@@ -493,15 +519,22 @@ function buildGearTrain(context is Context, id is Id, model is map, opts is map)
             transforms = [transform(vector(rowX, 0 * millimeter, 0 * millimeter))];
             names = ["i0"];
         }
-        if (size(transforms) > 1)
+        try
         {
-            opPattern(context, pid + "pat", {
-                "entities" : body,
-                "transforms" : subArray(transforms, 1, size(transforms)),
-                "instanceNames" : subArray(names, 1, size(names))
-            });
+            if (size(transforms) > 1)
+            {
+                opPattern(context, pid + "pat", {
+                    "entities" : body,
+                    "transforms" : subArray(transforms, 1, size(transforms)),
+                    "instanceNames" : subArray(names, 1, size(names))
+                });
+            }
+            opTransform(context, pid + "move", { "bodies" : body, "transform" : transforms[0] });
         }
-        opTransform(context, pid + "move", { "bodies" : body, "transform" : transforms[0] });
+        catch (error)
+        {
+            throw regenError("Could not place part " ~ part.name ~ ": " ~ toString(error));
+        }
         rowX = rowX + 2 * part.refRadius * (1 + (part.internal ? 0.15 : 0)) * millimeter + opts.thickness;
     }
 }
