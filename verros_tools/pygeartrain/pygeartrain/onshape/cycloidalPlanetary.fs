@@ -303,6 +303,8 @@ function rotate2(p is array, angle is number) returns array
     return [p[0] * c - p[1] * s, p[0] * s + p[1] * c];
 }
 
+const SPLINE_SEGMENT_POINTS = 30;
+
 function mmPoints(pts is array, rot is number) returns array
 {
     var out = [];
@@ -310,11 +312,12 @@ function mmPoints(pts is array, rot is number) returns array
     {
         out = append(out, vector(rotate2(pts[i], rot)) * millimeter);
     }
-    // close the loop
-    out = append(out, out[0]);
     return out;
 }
 
+// A closed loop is drawn as several fit splines sharing their end points.  A single
+// closed spline cannot be lofted between rotated sections (its seam vertex has no
+// counterpart), whereas a loop of ~30-point segments lofts cleanly and stays smooth.
 function sketchLoops(context is Context, id is Id, loops is array, z is ValueWithUnits, rot is number, smooth is boolean) returns Query
 {
     const pl = plane(vector(0 * millimeter, 0 * millimeter, z), vector(0, 0, 1), vector(1, 0, 0));
@@ -322,13 +325,23 @@ function sketchLoops(context is Context, id is Id, loops is array, z is ValueWit
     for (var li = 0; li < size(loops); li += 1)
     {
         const pts = mmPoints(loops[li], rot);
-        if (smooth)
+        const n = size(pts);
+        if (!smooth)
         {
-            skFitSpline(sk, "loop" ~ li, { "points" : pts });
+            skPolyline(sk, "loop" ~ li, { "points" : append(pts, pts[0]) });
+            continue;
         }
-        else
+        const segs = max(2, floor(n / SPLINE_SEGMENT_POINTS));
+        for (var s = 0; s < segs; s += 1)
         {
-            skPolyline(sk, "loop" ~ li, { "points" : pts });
+            const start = floor(n * s / segs);
+            const stop = floor(n * (s + 1) / segs); // inclusive; wraps to the first point on the last segment
+            var seg = [];
+            for (var i = start; i <= stop; i += 1)
+            {
+                seg = append(seg, pts[i % n]);
+            }
+            skFitSpline(sk, "loop" ~ li ~ "s" ~ s, { "points" : seg });
         }
     }
     skSolve(sk);
