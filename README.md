@@ -53,11 +53,15 @@ FeatureScript engine:
 
 - **Parametric feature** `verros_tools/pygeartrain/pygeartrain/onshape/cycloidalPlanetary.fs`:
   paste into a Feature Studio and the "Cycloidal planetary" feature appears in
-  the Part Studio toolbar. Tooth counts, number of planets, epi/hypo mix,
-  optional second stage, size (by ring outer diameter or planet-centre circle),
-  thickness, spur / helical / herringbone, and assembled vs. in-a-row layout are
-  all live parameters. Tooth profiles are computed in FeatureScript with the
-  same trochoid math as the library.
+  the Part Studio toolbar. Live parameters: tooth counts of ring, planets and
+  sun (and of a second stage), number of planets, epi/hypo mix, size by module,
+  planet-centre circle or ring tooth diameter, an explicit ring outer diameter,
+  thickness, spur / helical / herringbone with helix angle, tooth clearance
+  (total backlash, applied half to each profile), centre bores for sun and
+  planets, and assembled vs. in-a-row layout. Choose the input, output and
+  fixed members and the feature reports the gear ratio, module, pitch and outer
+  diameters and the planet-centre circle in its info message. Tooth profiles
+  are computed in FeatureScript with the same trochoid math as the library.
 - **Data-driven feature** from the "Onshape FeatureScript" card in the web app
   (or `fs_export.generate_featurescript` in Python): a Feature Studio with the
   current design's profiles embedded, for every gear type including cycloidal
