@@ -348,9 +348,11 @@ function sketchLoops(context is Context, id is Id, loops is array, z is ValueWit
     return qSketchRegion(id, true);
 }
 
-function deleteSketch(context is Context, id is Id)
+// The delete op must not be a child of the sketch id: Onshape rejects a parent id that is
+// used again after another operation ("used at two non-contiguous points").
+function deleteSketch(context is Context, opId is Id, sketchId is Id)
 {
-    opDeleteBodies(context, id + "del", { "entities" : qCreatedBy(id, EntityType.BODY) });
+    opDeleteBodies(context, opId, { "entities" : qCreatedBy(sketchId, EntityType.BODY) });
 }
 
 // A straight or twisted solid from one outer loop (and optional straight holes), mid-plane at z = 0.
@@ -369,7 +371,7 @@ function loopSolid(context is Context, id is Id, loops is array, halfTwist is nu
             "entities" : region, "direction" : vector(0, 0, 1),
             "endBound" : BoundingType.BLIND, "endDepth" : thickness
         });
-        deleteSketch(context, id + "sk");
+        deleteSketch(context, id + "delSk", id + "sk");
         return qCreatedBy(id + "ex", EntityType.BODY);
     }
     if (toothType == ToothType.HELIX)
@@ -385,9 +387,9 @@ function loopSolid(context is Context, id is Id, loops is array, halfTwist is nu
         {
             throw regenError("Helical loft failed (" ~ size(loops[0]) ~ " points, twist " ~ halfTwist ~ " rad): " ~ toString(error));
         }
-        deleteSketch(context, id + "skA");
-        deleteSketch(context, id + "skB");
-        deleteSketch(context, id + "skC");
+        deleteSketch(context, id + "delA", id + "skA");
+        deleteSketch(context, id + "delB", id + "skB");
+        deleteSketch(context, id + "delC", id + "skC");
         return qCreatedBy(id + "loft", EntityType.BODY);
     }
     // herringbone: two lofts meeting at the mid-plane
@@ -403,9 +405,9 @@ function loopSolid(context is Context, id is Id, loops is array, halfTwist is nu
     {
         throw regenError("Herringbone loft failed (" ~ size(loops[0]) ~ " points, twist " ~ halfTwist ~ " rad): " ~ toString(error));
     }
-    deleteSketch(context, id + "skA");
-    deleteSketch(context, id + "skB");
-    deleteSketch(context, id + "skC");
+    deleteSketch(context, id + "delA", id + "skA");
+    deleteSketch(context, id + "delB", id + "skB");
+    deleteSketch(context, id + "delC", id + "skC");
     opBoolean(context, id + "join", {
         "tools" : qUnion([qCreatedBy(id + "loftA", EntityType.BODY), qCreatedBy(id + "loftB", EntityType.BODY)]),
         "operationType" : BooleanOperationType.UNION
