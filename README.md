@@ -46,6 +46,30 @@ rings become solid pins, and discs keep their bearing holes. The geometry comes
 from `pygeartrain/solid_model.py`, which turns the 2D profiles into faces with
 holes plus placements; the same description drives the desktop exporter.
 
+### Onshape
+
+Two ways to get a design into Onshape, both verified against Onshape's own
+FeatureScript engine:
+
+- **Parametric feature** `verros_tools/pygeartrain/pygeartrain/onshape/cycloidalPlanetary.fs`:
+  paste into a Feature Studio and the "Cycloidal planetary" feature appears in
+  the Part Studio toolbar. Tooth counts, number of planets, epi/hypo mix,
+  optional second stage, size (by ring outer diameter or planet-centre circle),
+  thickness, spur / helical / herringbone, and assembled vs. in-a-row layout are
+  all live parameters. Tooth profiles are computed in FeatureScript with the
+  same trochoid math as the library.
+- **Data-driven feature** from the "Onshape FeatureScript" card in the web app
+  (or `fs_export.generate_featurescript` in Python): a Feature Studio with the
+  current design's profiles embedded, for every gear type including cycloidal
+  drives and the Nabtesco. Thickness, tooth type, helix angle, stage gap and
+  layout stay editable in Onshape.
+
+Both share one geometry builder (the section between the `builder begin/end`
+markers), which draws each loop as ~30-point fit-spline segments so that
+rotated sections loft into helical and herringbone teeth, cuts ring gears from
+a wall cylinder, keeps bearing holes straight, and places instances with
+patterns.
+
 ### Run locally
 
 ```bash
